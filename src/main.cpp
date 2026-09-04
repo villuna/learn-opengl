@@ -6,6 +6,7 @@
 #define WINDOW_HEIGHT 600
 
 int main() {
+    // Set up GLFW and spawn a window
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -20,24 +21,29 @@ int main() {
         return 1;
     }
 
+    // Attach gl context to window
     glfwMakeContextCurrent(window);
 
+    // Use glad to load OpenGL extension functions
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) {
         std::cout << "Failed to initialise GLAD" << std::endl;
         return 1;
     }
 
+    // Set the size of the viewport and set it to resize automatically
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 
     glfwSetFramebufferSizeCallback(window, [](GLFWwindow *window, int width, int height) {
         glViewport(0, 0, width, height);
     });
 
+    // Render loop
     while (!glfwWindowShouldClose(window)) {
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
+    // goodbye
     glfwTerminate();
 
     return 0;
