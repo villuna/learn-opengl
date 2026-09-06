@@ -15,10 +15,12 @@
 #define FPS_SAMPLES 10
 
 const float vertices[] = {
-     0.5,  0.5, 0.0, // top right
-     0.5, -0.5, 0.0, // bottom right
-    -0.5, -0.5, 0.0, // bottom left
-    -0.5,  0.5, 0.0  // top left
+    -0.5, 0, 0,
+    -0.25, 0.5, 0,
+    0, 0, 0,
+    0.2, 0, 0,
+    0.45, 0.5, 0,
+    0.7, 0, 0
 };
 
 const unsigned int indices[] = {
@@ -27,7 +29,7 @@ const unsigned int indices[] = {
 };
 
 struct Args {
-    bool show_fps, vsync;
+    bool show_fps, vsync_off;
 
     Args() : show_fps(false) {}
     Args(int argc, char **argv) : Args() {
@@ -36,7 +38,7 @@ struct Args {
         while ((opt = getopt(argc, argv, "vf")) != -1) {
             switch (opt) {
             case 'v':
-                vsync = true;
+                vsync_off = true;
                 break;
             case 'f':
                 show_fps = true;
@@ -54,13 +56,11 @@ class App {
     Args args;
 
     // Vertex buffer object - handle to the vertex buffer on the gpu
-    unsigned int vbo;
-    // Element buffer object - handle to the index buffer on the gpu
-    unsigned int ebo;
+    GLuint vbo[2];
     // Vertex array object - stores data telling the gpu how to interpret the vertex buffer
-    unsigned int vao;
+    GLuint vao[2];
 
-    unsigned int shaderProgram;
+    unsigned int shaderProgram[2];
 
     std::deque<double> frame_samples;
 
@@ -74,9 +74,13 @@ class App {
         set_clear_colour(bg_colour);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glUseProgram(shaderProgram);
-        glBindVertexArray(vao);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glUseProgram(shaderProgram[0]);
+        glBindVertexArray(vao[0]);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+
+        glUseProgram(shaderProgram[1]);
+        glBindVertexArray(vao[1]);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
 
         glfwSwapBuffers(window);
     }
@@ -116,6 +120,7 @@ class App {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+        glfwWindowHint(GLFW_SAMPLES, 8);
 
         window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Hello OpenGL",
             nullptr, nullptr);
@@ -127,7 +132,7 @@ class App {
         // Attach gl context to window
         glfwMakeContextCurrent(window);
 
-        if (args.vsync) {
+        if (args.vsync_off) {
             glfwSwapInterval(0);
         } else {
             glfwSwapInterval(1);
@@ -143,6 +148,8 @@ class App {
         glfwSetFramebufferSizeCallback(window, [](GLFWwindow *window, int width, int height) {
             glViewport(0, 0, width, height);
         });
+
+        glEnable(GL_MULTISAMPLE);
     }
 
 public:
@@ -152,23 +159,21 @@ public:
         init_window();
 
         // Initialise vbo and vao for the triangle
-        glGenVertexArrays(1, &vao);
-        glBindVertexArray(vao);
+        glGenVertexArrays(2, vao);
+        glGenBuffers(2, vbo);
 
-        // Create the vertex and index buffer
-        glGenBuffers(1, &vbo);
-        glGenBuffers(1, &ebo);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+        for (int i = 0; i < 2; i++) {
+            glBindVertexArray(vao[i]);
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+            glBindBuffer(GL_ARRAY_BUFFER, vbo[i]);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 9, vertices + (9 * i), GL_STATIC_DRAW);
 
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*) 0);
-        glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*) 0);
+            glEnableVertexAttribArray(0);
+        }
 
         // Compile shaders
-        unsigned int vertexShader, fragmentShader;
+        unsigned int vertexShader, fragmentShader, fragmentShader2;
 
         vertexShader = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(vertexShader, 1, &TRIANGLE_VERT, NULL);
@@ -180,10 +185,22 @@ public:
         glCompileShader(fragmentShader);
         checkShader(fragmentShader);
 
-        shaderProgram = glCreateProgram();
-        glAttachShader(shaderProgram, vertexShader);
-        glAttachShader(shaderProgram, fragmentShader);
-        glLinkProgram(shaderProgram);
+
+        fragmentShader2 = glCreateShader(GL_FRAGMENT_SHADER);
+        glShaderSource(fragmentShader2, 1, &TRIANGLE2_FRAG, NULL);
+        glCompileShader(fragmentShader2);
+        checkShader(fragmentShader2);
+
+        shaderProgram[0] = glCreateProgram();
+        glAttachShader(shaderProgram[0], vertexShader);
+        glAttachShader(shaderProgram[0], fragmentShader);
+        glLinkProgram(shaderProgram[0]);
+
+
+        shaderProgram[1] = glCreateProgram();
+        glAttachShader(shaderProgram[1], vertexShader);
+        glAttachShader(shaderProgram[1], fragmentShader2);
+        glLinkProgram(shaderProgram[1]);
 
         glDeleteShader(vertexShader);
         glDeleteShader(fragmentShader);

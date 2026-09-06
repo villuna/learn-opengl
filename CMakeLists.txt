@@ -6,8 +6,14 @@ project(learnopengl)
 
 add_executable(logl)
 
+set(SHADERS_DIR ${CMAKE_SOURCE_DIR}/src/shaders)
+
 add_custom_command(
-  OUTPUT ${CMAKE_SOURCE_DIR}/src/shaders/shaders.h
+  DEPENDS
+    ${SHADERS_DIR}/triangle.frag
+    ${SHADERS_DIR}/triangle.vert
+    ${SHADERS_DIR}/triangle2.frag
+  OUTPUT ${SHADERS_DIR}/shaders.h
   COMMAND runghc embed_shaders.hs
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
