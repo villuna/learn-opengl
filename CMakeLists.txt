@@ -14,6 +14,7 @@ target_include_directories(logl PRIVATE dependencies/glad/include)
 target_sources(logl
   PRIVATE
     src/main.cpp
+    src/util.cpp
     dependencies/glad/src/gl.c
 )
 
