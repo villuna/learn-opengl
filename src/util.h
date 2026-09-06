@@ -13,4 +13,4 @@ struct colour {
     colour(int r, int g, int b) : colour(r, g, b, 255) {}
 };
 
-void clear_colour(colour c);
+void set_clear_colour(colour c);

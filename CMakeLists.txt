@@ -6,6 +6,11 @@ project(learnopengl)
 
 add_executable(logl)
 
+add_custom_command(
+  OUTPUT ${CMAKE_SOURCE_DIR}/src/shaders/shaders.h
+  COMMAND runghc embed_shaders.hs
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
 add_subdirectory(dependencies/glfw)
 find_package(OpenGL)
 
@@ -15,6 +20,7 @@ target_sources(logl
   PRIVATE
     src/main.cpp
     src/util.cpp
+    src/shaders/shaders.h
     dependencies/glad/src/gl.c
 )
 
