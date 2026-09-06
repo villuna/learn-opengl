@@ -1,4 +1,6 @@
 #include <cassert>
+#include <cstring>
+#include <unistd.h>
 #include <iostream>
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
@@ -13,18 +15,54 @@
 #define FPS_SAMPLES 10
 
 const float vertices[] = {
-    -0.5, -0.5, 0.0,
-     0.5, -0.5, 0.0,
-     0.0,  0.5, 0.0
+     0.5,  0.5, 0.0, // top right
+     0.5, -0.5, 0.0, // bottom right
+    -0.5, -0.5, 0.0, // bottom left
+    -0.5,  0.5, 0.0  // top left
+};
+
+const unsigned int indices[] = {
+    0, 1, 3,
+    1, 2, 3
+};
+
+struct Args {
+    bool show_fps, vsync;
+
+    Args() : show_fps(false) {}
+    Args(int argc, char **argv) : Args() {
+        char opt;
+
+        while ((opt = getopt(argc, argv, "vf")) != -1) {
+            switch (opt) {
+            case 'v':
+                vsync = true;
+                break;
+            case 'f':
+                show_fps = true;
+                break;
+            default:
+                throw std::runtime_error("couldn't parse command line args");
+            }
+        }
+    }
 };
 
 class App {
     GLFWwindow *window;
     colour bg_colour;
+    Args args;
 
+    // Vertex buffer object - handle to the vertex buffer on the gpu
     unsigned int vbo;
+    // Element buffer object - handle to the index buffer on the gpu
+    unsigned int ebo;
+    // Vertex array object - stores data telling the gpu how to interpret the vertex buffer
     unsigned int vao;
+
     unsigned int shaderProgram;
+
+    std::deque<double> frame_samples;
 
     void process_input() {
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
@@ -38,7 +76,7 @@ class App {
 
         glUseProgram(shaderProgram);
         glBindVertexArray(vao);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
         glfwSwapBuffers(window);
     }
@@ -89,6 +127,12 @@ class App {
         // Attach gl context to window
         glfwMakeContextCurrent(window);
 
+        if (args.vsync) {
+            glfwSwapInterval(0);
+        } else {
+            glfwSwapInterval(1);
+        }
+
         // Use glad to load OpenGL extension functions
         if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) {
             throw std::runtime_error("Couldn't initialise GLAD");
@@ -102,8 +146,8 @@ class App {
     }
 
 public:
-    App() :
-        window(nullptr), bg_colour(21, 0, 54)
+    App(Args args) :
+        args(args), window(nullptr), bg_colour(21, 0, 54)
     {
         init_window();
 
@@ -111,14 +155,17 @@ public:
         glGenVertexArrays(1, &vao);
         glBindVertexArray(vao);
 
-        // Create the buffer
+        // Create the vertex and index buffer
         glGenBuffers(1, &vbo);
+        glGenBuffers(1, &ebo);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*) 0);
         glEnableVertexAttribArray(0);
-        glBindVertexArray(GL_NONE);
 
         // Compile shaders
         unsigned int vertexShader, fragmentShader;
@@ -146,11 +193,21 @@ public:
         glfwTerminate();
     }
 
-    void use_vsync(bool use) {
-        if (use) {
-            glfwSwapInterval(1);
-        } else {
-            glfwSwapInterval(0);
+    void update_fps_counter(double dt) {
+        double sample = 1 / dt;
+        frame_samples.push_back(sample);
+        if (frame_samples.size() > FPS_SAMPLES) {
+            frame_samples.pop_front();
+        }
+
+        double fps = 0;
+        for (auto s = frame_samples.begin(); s != frame_samples.end(); s++) {
+            fps += *s;
+        }
+        fps = fps / (double)frame_samples.size();
+
+        if (args.show_fps) {
+            std::cout << "fps: " << fps << std::endl;
         }
     }
 
@@ -167,29 +224,18 @@ public:
             glfwPollEvents();
 
             double newTime = glfwGetTime();
-            double elapsed = newTime - time;
+            double dt = newTime - time;
             time = newTime;
-
-            double sample = 1 / elapsed;
-            samples.push_back(sample);
-            if (samples.size() > FPS_SAMPLES) {
-                samples.pop_front();
-            }
-
-            double fps = 0;
-            for (auto s = samples.begin(); s != samples.end(); s++) {
-                fps += *s;
-            }
-            fps = fps / (double)samples.size();
-            std::cout << "fps: " << fps << std::endl;
+            update_fps_counter(dt);
         }
     }
 };
 
-
-int main() {
+int main(int argc, char **argv) {
     try {
-        App app;
+        Args args(argc, argv);
+
+        App app(args);
         app.run();
 
         return 0;
