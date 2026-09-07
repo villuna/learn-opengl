@@ -9,6 +9,7 @@
 #include "shader.h"
 #include "util.h"
 #include "shaders/shaders.h"
+#include "stb_image.h"
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
@@ -17,16 +18,19 @@
 struct vertex {
     float pos[3];
     float col[3];
+    float tex_coord[2];
 };
 
-const vertex vertices[] = {
-    {.pos = {-1, 0, 0}, .col = {1, 0, 0}},
-    {.pos = {-0.5, 1, 0}, .col = {0, 1, 0}},
-    {.pos = {0, 0, 0}, .col = {0, 0, 1}},
+vertex vertices[] = {
+    {.pos = {0.5f, 0.5f, 0.0f}, .col = {1.0f, 0.0f, 0.0f}, .tex_coord = {1.0f, 1.0f}}, // top right
+    {.pos = {0.5f, -0.5f, 0.0f}, .col = {0.0f, 1.0f, 0.0f}, .tex_coord = {1.0f, 0.0f}}, // bottom right
+    {.pos = {-0.5f, -0.5f, 0.0f}, .col = {0.0f, 0.0f, 1.0f}, .tex_coord = {0.0f, 0.0f}}, // bottom left
+    {.pos = {-0.5f, 0.5f, 0.0f}, .col = {1.0f, 1.0f, 0.0f}, .tex_coord = {0.0f, 1.0f}} // top left
 };
 
 const unsigned int indices[] = {
-    0, 1, 2,
+    0, 1, 3,
+    1, 2, 3
 };
 
 struct Args {
@@ -61,6 +65,7 @@ class App {
     // Vertex array object - stores data telling the gpu how to interpret the vertex buffer
     GLuint vao;
     GLuint ebo;
+    GLuint texture;
 
     Shader shaderProgram;
 
@@ -80,8 +85,9 @@ class App {
 
         shaderProgram.use();
         shaderProgram.setFloat("horizOffset", offset);
+        glBindTexture(GL_TEXTURE_2D, texture);
         glBindVertexArray(vao);
-        glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, (void *)0);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
         glfwSwapBuffers(window);
     }
@@ -130,7 +136,7 @@ public:
         shaderProgram()
     {
         init_window();
-        shaderProgram = Shader(TRIANGLE_VERT, TRIANGLE_FRAG);
+        shaderProgram = Shader(TEXTURE_VERT, TEXTURE_FRAG);
 
         // Initialise vbo and vao for the triangle
         glGenVertexArrays(1, &vao);
@@ -150,6 +156,27 @@ public:
 
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*) sizeof(float[3]));
         glEnableVertexAttribArray(1);
+
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*) sizeof(float[6]));
+        glEnableVertexAttribArray(2);
+
+        int width, height, channels;
+        unsigned char *data = stbi_load("assets/container.jpg", &width, &height, &channels, 0);
+
+        if (!data) {
+            throw std::runtime_error("Couldn't load container.jpg");
+        }
+
+        glGenTextures(1, &texture);
+        glBindTexture(GL_TEXTURE_2D, texture);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        stbi_image_free(data);
     }
 
     ~App() {
@@ -201,6 +228,7 @@ public:
 
 int main(int argc, char **argv) {
     try {
+        std::cout << sizeof(vertices) << std::endl;
         Args args(argc, argv);
 
         App app(args);

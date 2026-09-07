@@ -5,7 +5,7 @@
 
 // Checks to see if the shader compiled correctly. Returns a string containing an error message if
 // it encountered an error.
-std::optional<std::string> checkShader(unsigned int shaderId) {
+std::optional<std::string> checkShader(unsigned int shaderId, const char *stage) {
     int success;
     char infoLog[512];
     glGetShaderiv(shaderId, GL_COMPILE_STATUS, &success);
@@ -13,7 +13,7 @@ std::optional<std::string> checkShader(unsigned int shaderId) {
     if (!success) {
         glGetShaderInfoLog(shaderId, 512, NULL, infoLog);
         std::stringstream errMsg;
-        errMsg << "Error compiling shader: ";
+        errMsg << "Error compiling " << stage << " shader: ";
         errMsg << infoLog;
         return errMsg.str();
     }
@@ -45,7 +45,7 @@ Shader::Shader(const char *vertex, const char *fragment) {
     vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertex, NULL);
     glCompileShader(vertexShader);
-    if ((errMsg = checkShader(vertexShader)).has_value()) {
+    if ((errMsg = checkShader(vertexShader, "vertex")).has_value()) {
         glDeleteShader(vertexShader);
         throw std::runtime_error(*errMsg);
     }
@@ -53,7 +53,7 @@ Shader::Shader(const char *vertex, const char *fragment) {
     fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragmentShader, 1, &fragment, NULL);
     glCompileShader(fragmentShader);
-    if ((errMsg = checkShader(fragmentShader)).has_value()) {
+    if ((errMsg = checkShader(fragmentShader, "fragment")).has_value()) {
         glDeleteShader(vertexShader);
         glDeleteShader(fragmentShader);
         throw std::runtime_error(*errMsg);

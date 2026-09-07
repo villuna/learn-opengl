@@ -10,8 +10,8 @@ set(SHADERS_DIR ${CMAKE_SOURCE_DIR}/src/shaders)
 
 add_custom_command(
   DEPENDS
-    ${SHADERS_DIR}/triangle.frag
-    ${SHADERS_DIR}/triangle.vert
+    ${SHADERS_DIR}/texture.frag
+    ${SHADERS_DIR}/texture.vert
   OUTPUT ${SHADERS_DIR}/shaders.h
   COMMAND runghc embed_shaders.hs
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -20,6 +20,7 @@ add_subdirectory(dependencies/glfw)
 find_package(OpenGL)
 
 target_include_directories(logl PRIVATE dependencies/glad/include)
+target_include_directories(logl PRIVATE dependencies/stb-image)
 
 target_sources(logl
   PRIVATE
@@ -28,6 +29,7 @@ target_sources(logl
     src/shader.cpp
     src/shaders/shaders.h
     dependencies/glad/src/gl.c
+    dependencies/stb-image/stb_image.cpp
 )
 
 target_link_libraries(logl
