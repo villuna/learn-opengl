@@ -12,7 +12,6 @@ add_custom_command(
   DEPENDS
     ${SHADERS_DIR}/triangle.frag
     ${SHADERS_DIR}/triangle.vert
-    ${SHADERS_DIR}/triangle2.frag
   OUTPUT ${SHADERS_DIR}/shaders.h
   COMMAND runghc embed_shaders.hs
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -26,6 +25,7 @@ target_sources(logl
   PRIVATE
     src/main.cpp
     src/util.cpp
+    src/shader.cpp
     src/shaders/shaders.h
     dependencies/glad/src/gl.c
 )

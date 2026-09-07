@@ -3,26 +3,32 @@
 #pragma once
 
 constexpr const char *TRIANGLE_VERT = R"---(#version 330 core
-layout (location = 0) in vec3 pos;
+layout (location = 0) in vec3 vertexPos;
+layout (location = 1) in vec3 vertexCol;
+
+uniform float horizOffset;
+
+out vec3 outCol;
+out vec3 position;
 
 void main() {
-    gl_Position = vec4(pos, 1.0);
+    vec4 outPos = vec4(vertexPos, 1.0);
+    outPos.z = outPos.x + outPos.y;
+    outPos.x += horizOffset;
+    outCol = vertexCol;
+    position = outPos.xyz;
+    gl_Position = outPos;
 }
 )---";
 
 constexpr const char *TRIANGLE_FRAG = R"---(#version 330 core
-out vec4 colour;
+out vec4 fragColour;
+
+in vec3 outCol;
+in vec3 position;
 
 void main() {
-    colour = vec4(1.0f, 0.5f, 0.3f, 1.0f);
-}
-)---";
-
-constexpr const char *TRIANGLE2_FRAG = R"---(#version 330 core
-out vec4 colour;
-
-void main() {
-    colour = vec4(1.0, 1.0, 0.5, 1.0);
+    fragColour = vec4(position, 1);
 }
 )---";
 

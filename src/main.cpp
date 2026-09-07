@@ -1,12 +1,12 @@
 #include <cassert>
-#include <cstring>
+#include <cmath>
 #include <unistd.h>
 #include <iostream>
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
 #include <deque>
-#include <sstream>
 #include <stdexcept>
+#include "shader.h"
 #include "util.h"
 #include "shaders/shaders.h"
 
@@ -14,18 +14,19 @@
 #define WINDOW_HEIGHT 600
 #define FPS_SAMPLES 10
 
-const float vertices[] = {
-    -0.5, 0, 0,
-    -0.25, 0.5, 0,
-    0, 0, 0,
-    0.2, 0, 0,
-    0.45, 0.5, 0,
-    0.7, 0, 0
+struct vertex {
+    float pos[3];
+    float col[3];
+};
+
+const vertex vertices[] = {
+    {.pos = {-1, 0, 0}, .col = {1, 0, 0}},
+    {.pos = {-0.5, 1, 0}, .col = {0, 1, 0}},
+    {.pos = {0, 0, 0}, .col = {0, 0, 1}},
 };
 
 const unsigned int indices[] = {
-    0, 1, 3,
-    1, 2, 3
+    0, 1, 2,
 };
 
 struct Args {
@@ -56,11 +57,12 @@ class App {
     Args args;
 
     // Vertex buffer object - handle to the vertex buffer on the gpu
-    GLuint vbo[2];
+    GLuint vbo;
     // Vertex array object - stores data telling the gpu how to interpret the vertex buffer
-    GLuint vao[2];
+    GLuint vao;
+    GLuint ebo;
 
-    unsigned int shaderProgram[2];
+    Shader shaderProgram;
 
     std::deque<double> frame_samples;
 
@@ -73,45 +75,15 @@ class App {
     void render() {
         set_clear_colour(bg_colour);
         glClear(GL_COLOR_BUFFER_BIT);
+        double time = glfwGetTime();
+        double offset = std::sin(time) * 0.5;
 
-        glUseProgram(shaderProgram[0]);
-        glBindVertexArray(vao[0]);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-
-        glUseProgram(shaderProgram[1]);
-        glBindVertexArray(vao[1]);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        shaderProgram.use();
+        shaderProgram.setFloat("horizOffset", offset);
+        glBindVertexArray(vao);
+        glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, (void *)0);
 
         glfwSwapBuffers(window);
-    }
-
-    // Checks to see if a shader compiled correctly and throws a runtime error if not
-    void checkShader(unsigned int shaderId) {
-        int success;
-        char infoLog[512];
-        glGetShaderiv(shaderId, GL_COMPILE_STATUS, &success);
-
-        if (!success) {
-            glGetShaderInfoLog(shaderId, 512, NULL, infoLog);
-            std::stringstream errMsg;
-            errMsg << "Error compiling shader: ";
-            errMsg << infoLog;
-            throw std::runtime_error(errMsg.str());
-        }
-    }
-
-    void checkShaderProgram(unsigned int programId) {
-        int success;
-        char infoLog[512];
-        glGetProgramiv(programId, GL_LINK_STATUS, &success);
-
-        if (!success) {
-            glGetProgramInfoLog(programId, 512, NULL, infoLog);
-            std::stringstream errMsg;
-            errMsg << "Error linking shader program: ";
-            errMsg << infoLog;
-            throw std::runtime_error(errMsg.str());
-        }
     }
 
     // Initialises GLFW and OpenGL and sets up the window ready to be rendered to.
@@ -154,61 +126,40 @@ class App {
 
 public:
     App(Args args) :
-        args(args), window(nullptr), bg_colour(21, 0, 54)
+        args(args), window(nullptr), bg_colour(21, 0, 54),
+        shaderProgram()
     {
         init_window();
+        shaderProgram = Shader(TRIANGLE_VERT, TRIANGLE_FRAG);
 
         // Initialise vbo and vao for the triangle
-        glGenVertexArrays(2, vao);
-        glGenBuffers(2, vbo);
+        glGenVertexArrays(1, &vao);
+        glGenBuffers(1, &vbo);
+        glGenBuffers(1, &ebo);
 
-        for (int i = 0; i < 2; i++) {
-            glBindVertexArray(vao[i]);
+        glBindVertexArray(vao);
 
-            glBindBuffer(GL_ARRAY_BUFFER, vbo[i]);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 9, vertices + (9 * i), GL_STATIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*) 0);
-            glEnableVertexAttribArray(0);
-        }
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-        // Compile shaders
-        unsigned int vertexShader, fragmentShader, fragmentShader2;
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*) 0);
+        glEnableVertexAttribArray(0);
 
-        vertexShader = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(vertexShader, 1, &TRIANGLE_VERT, NULL);
-        glCompileShader(vertexShader);
-        checkShader(vertexShader);
-
-        fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(fragmentShader, 1, &TRIANGLE_FRAG, NULL);
-        glCompileShader(fragmentShader);
-        checkShader(fragmentShader);
-
-
-        fragmentShader2 = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(fragmentShader2, 1, &TRIANGLE2_FRAG, NULL);
-        glCompileShader(fragmentShader2);
-        checkShader(fragmentShader2);
-
-        shaderProgram[0] = glCreateProgram();
-        glAttachShader(shaderProgram[0], vertexShader);
-        glAttachShader(shaderProgram[0], fragmentShader);
-        glLinkProgram(shaderProgram[0]);
-
-
-        shaderProgram[1] = glCreateProgram();
-        glAttachShader(shaderProgram[1], vertexShader);
-        glAttachShader(shaderProgram[1], fragmentShader2);
-        glLinkProgram(shaderProgram[1]);
-
-        glDeleteShader(vertexShader);
-        glDeleteShader(fragmentShader);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*) sizeof(float[3]));
+        glEnableVertexAttribArray(1);
     }
 
     ~App() {
         glfwTerminate();
     }
+    // Just to be safe
+    App(const App&) = delete;
+    App& operator=(const App&) = delete;
+    App(App&&) = delete;
+    App& operator=(App&&) = delete;
 
     void update_fps_counter(double dt) {
         double sample = 1 / dt;

@@ -1,0 +1,33 @@
+#pragma once
+
+#include <glad/gl.h>
+#include <string>
+
+class Shader {
+public:
+    GLuint id;
+
+    Shader() noexcept : id(GL_NONE) {}
+    Shader(const char *vertex, const char *fragment);
+    ~Shader();
+
+    // Rule of 5 stuff. The learn opengl tutorial just has the shader silently leak memory...
+    Shader(const Shader&) = delete;
+    Shader& operator=(const Shader&) = delete;
+
+    Shader(Shader&& other) {
+        id = other.id;
+        other.id = GL_NONE;
+    }
+    Shader& operator=(Shader&& other) {
+        id = other.id;
+        other.id = GL_NONE;
+        return *this;
+    }
+
+    void use();
+
+    void setBool(const std::string& name, bool value) const;
+    void setInt(const std::string& name, int value) const;
+    void setFloat(const std::string& name, float value) const;
+};
