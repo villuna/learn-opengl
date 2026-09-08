@@ -3,6 +3,7 @@
 #include <glad/gl.h>
 #include <string>
 #include <glm/glm.hpp>
+#include <utility>
 
 class Shader {
 public:
@@ -17,12 +18,10 @@ public:
     Shader& operator=(const Shader&) = delete;
 
     Shader(Shader&& other) {
-        id = other.id;
-        other.id = GL_NONE;
+        std::swap(this->id, other.id);
     }
     Shader& operator=(Shader&& other) {
-        id = other.id;
-        other.id = GL_NONE;
+        std::swap(this->id, other.id);
         return *this;
     }
 

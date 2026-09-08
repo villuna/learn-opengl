@@ -236,6 +236,7 @@ public:
     ~App() {
         glfwTerminate();
     }
+
     // Just to be safe
     App(const App&) = delete;
     App& operator=(const App&) = delete;
