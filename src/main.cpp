@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <unistd.h>
@@ -22,10 +23,10 @@ struct vertex {
 };
 
 vertex vertices[] = {
-    {.pos = {0.5f, 0.5f, 0.0f}, .col = {1.0f, 0.0f, 0.0f}, .tex_coord = {1.0f, 1.0f}}, // top right
-    {.pos = {0.5f, -0.5f, 0.0f}, .col = {0.0f, 1.0f, 0.0f}, .tex_coord = {1.0f, 0.0f}}, // bottom right
+    {.pos = {0.5f, 0.5f, 0.0f}, .col = {1.0f, 0.0f, 0.0f}, .tex_coord = {2.0f, 2.0f}}, // top right
+    {.pos = {0.5f, -0.5f, 0.0f}, .col = {0.0f, 1.0f, 0.0f}, .tex_coord = {2.0f, 0.0f}}, // bottom right
     {.pos = {-0.5f, -0.5f, 0.0f}, .col = {0.0f, 0.0f, 1.0f}, .tex_coord = {0.0f, 0.0f}}, // bottom left
-    {.pos = {-0.5f, 0.5f, 0.0f}, .col = {1.0f, 1.0f, 0.0f}, .tex_coord = {0.0f, 1.0f}} // top left
+    {.pos = {-0.5f, 0.5f, 0.0f}, .col = {1.0f, 1.0f, 0.0f}, .tex_coord = {0.0f, 2.0f}} // top left
 };
 
 const unsigned int indices[] = {
@@ -65,16 +66,26 @@ class App {
     // Vertex array object - stores data telling the gpu how to interpret the vertex buffer
     GLuint vao;
     GLuint ebo;
-    GLuint texture;
-
+    GLuint textures[2];
     Shader shaderProgram;
+
+    float mix;
 
     std::deque<double> frame_samples;
 
-    void process_input() {
+    void process_input(float dt) {
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
             glfwSetWindowShouldClose(window, true);
         }
+
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+            mix += 0.5 * dt;
+        }
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+            mix -= 0.5 * dt;
+        }
+
+        mix = std::clamp(mix, 0.0f, 1.0f);
     }
 
     void render() {
@@ -85,7 +96,11 @@ class App {
 
         shaderProgram.use();
         shaderProgram.setFloat("horizOffset", offset);
-        glBindTexture(GL_TEXTURE_2D, texture);
+        shaderProgram.setFloat("mixAmount", mix);
+        for (int i = 0; i < 2; i++) {
+            glActiveTexture(GL_TEXTURE0 + i);
+            glBindTexture(GL_TEXTURE_2D, textures[i]);
+        }
         glBindVertexArray(vao);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
@@ -133,7 +148,7 @@ class App {
 public:
     App(Args args) :
         args(args), window(nullptr), bg_colour(21, 0, 54),
-        shaderProgram()
+        shaderProgram(), mix(0.3)
     {
         init_window();
         shaderProgram = Shader(TEXTURE_VERT, TEXTURE_FRAG);
@@ -160,15 +175,19 @@ public:
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*) sizeof(float[6]));
         glEnableVertexAttribArray(2);
 
+        // Load textures, first one is a jpg with no transparency, second is a png with transparency
+        glGenTextures(2, textures);
+
         int width, height, channels;
-        unsigned char *data = stbi_load("assets/container.jpg", &width, &height, &channels, 0);
+        // Need to flip the textures to align with the opengl rendering axes
+        stbi_set_flip_vertically_on_load(true);
+        unsigned char *data = stbi_load("assets/house md.jpg", &width, &height, &channels, 0);
 
         if (!data) {
-            throw std::runtime_error("Couldn't load container.jpg");
+            throw std::runtime_error("Couldn't load jpg");
         }
 
-        glGenTextures(1, &texture);
-        glBindTexture(GL_TEXTURE_2D, texture);
+        glBindTexture(GL_TEXTURE_2D, textures[0]);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -177,6 +196,27 @@ public:
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
         stbi_image_free(data);
+
+        data = stbi_load("assets/don chan.png", &width, &height, &channels, 0);
+
+        if (!data) {
+            throw std::runtime_error("Couldn't load jpg");
+        }
+
+        glBindTexture(GL_TEXTURE_2D, textures[1]);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        stbi_image_free(data);
+
+        // Tell the gpu which texture corresponds to which varname in the shader
+        shaderProgram.use();
+        shaderProgram.setInt("texture1", 0);
+        shaderProgram.setInt("texture2", 1);
     }
 
     ~App() {
@@ -208,18 +248,19 @@ public:
 
     void run() {
         double time = glfwGetTime();
+        double dt = 0;
         std::deque<double> samples;
 
         // Render loop
         while (!glfwWindowShouldClose(window)) {
-            process_input();
+            process_input(dt);
 
             render();
 
             glfwPollEvents();
 
             double newTime = glfwGetTime();
-            double dt = newTime - time;
+            dt = newTime - time;
             time = newTime;
             update_fps_counter(dt);
         }
@@ -228,7 +269,6 @@ public:
 
 int main(int argc, char **argv) {
     try {
-        std::cout << sizeof(vertices) << std::endl;
         Args args(argc, argv);
 
         App app(args);
