@@ -2,6 +2,7 @@
 
 #include <glad/gl.h>
 #include <string>
+#include <glm/glm.hpp>
 
 class Shader {
 public:
@@ -30,4 +31,5 @@ public:
     void setBool(const std::string& name, bool value) const;
     void setInt(const std::string& name, int value) const;
     void setFloat(const std::string& name, float value) const;
+    void setMat4x4(const std::string& name, glm::mat4x4 value) const;
 };

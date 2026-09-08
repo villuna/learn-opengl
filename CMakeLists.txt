@@ -17,6 +17,7 @@ add_custom_command(
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_subdirectory(dependencies/glfw)
+add_subdirectory(dependencies/glm)
 find_package(OpenGL)
 
 target_include_directories(logl PRIVATE dependencies/glad/include)
@@ -35,4 +36,5 @@ target_sources(logl
 target_link_libraries(logl
   PRIVATE
     glfw
-    OpenGL::GL)
+    OpenGL::GL
+    glm::glm)

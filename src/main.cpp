@@ -1,3 +1,6 @@
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -7,10 +10,12 @@
 #include <GLFW/glfw3.h>
 #include <deque>
 #include <stdexcept>
+#include <stb_image.h>
+
+#include "glm/ext/matrix_transform.hpp"
 #include "shader.h"
 #include "util.h"
 #include "shaders/shaders.h"
-#include "stb_image.h"
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
@@ -70,6 +75,7 @@ class App {
     Shader shaderProgram;
 
     float mix;
+    glm::mat4x4 trans;
 
     std::deque<double> frame_samples;
 
@@ -94,10 +100,14 @@ class App {
         double time = glfwGetTime();
         double offset = std::sin(time) * 0.5;
 
+        trans = glm::mat4x4(1.0);
+        trans = glm::translate(trans, glm::vec3(0.7, 0.2, 0.0));
+        trans = glm::rotate(trans, (float)time, glm::vec3(0, 0, 1));
+
         shaderProgram.use();
         shaderProgram.setFloat("horizOffset", offset);
         shaderProgram.setFloat("mixAmount", mix);
-        shaderProgram.setFloat("time", time);
+        shaderProgram.setMat4x4("trans", trans);
         for (int i = 0; i < 2; i++) {
             glActiveTexture(GL_TEXTURE0 + i);
             glBindTexture(GL_TEXTURE_2D, textures[i]);
@@ -149,7 +159,7 @@ class App {
 public:
     App(Args args) :
         args(args), window(nullptr), bg_colour(21, 0, 54),
-        shaderProgram(), mix(0.3)
+        shaderProgram(), mix(0.3), trans(1.0)
     {
         init_window();
         shaderProgram = Shader(TEXTURE_VERT, TEXTURE_FRAG);
@@ -218,6 +228,9 @@ public:
         shaderProgram.use();
         shaderProgram.setInt("texture1", 0);
         shaderProgram.setInt("texture2", 1);
+
+        trans = glm::scale(trans, glm::vec3(1.5));
+        trans = glm::rotate(trans, glm::radians(45.0f), glm::vec3(0, 0, 1));
     }
 
     ~App() {
