@@ -7,6 +7,10 @@ seems to be to write a small program to do it manually.
 
 Now, you are probably asking "why are you using haskell for scripts and not python?"
 The answer is because I think it's funny
+
+Update: I built a new computer and tried to compile my code and haskell wasn't
+installed. so I decided to just rewrite in python instead of installing haskell.
+But I'm keeping this here cuz it's funny.
 -}
 
 import System.Directory

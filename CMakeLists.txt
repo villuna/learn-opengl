@@ -13,7 +13,7 @@ add_custom_command(
     ${SHADERS_DIR}/texture.frag
     ${SHADERS_DIR}/texture.vert
   OUTPUT ${SHADERS_DIR}/shaders.h
-  COMMAND runghc embed_shaders.hs
+  COMMAND python embed_shaders.py
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_subdirectory(dependencies/glfw)
