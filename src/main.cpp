@@ -61,6 +61,19 @@ float vertices[] = {
     -0.5f, 0.5f, -0.5f, 0.0f, 1.0f
 };
 
+const glm::vec3 cubePositions[] = {
+    glm::vec3( 0.0f, 0.0f, 0.0f),
+    glm::vec3( 2.0f, 5.0f, -15.0f),
+    glm::vec3(-1.5f, -2.2f, -2.5f),
+    glm::vec3(-3.8f, -2.0f, -12.3f),
+    glm::vec3( 2.4f, -0.4f, -3.5f),
+    glm::vec3(-1.7f, 3.0f, -7.5f),
+    glm::vec3( 1.3f, -2.0f, -2.5f),
+    glm::vec3( 1.5f, 2.0f, -2.5f),
+    glm::vec3( 1.5f, 0.2f, -1.5f),
+    glm::vec3(-1.3f, 1.0f, -1.5f)
+};
+
 const unsigned int indices[] = {
     0, 1, 3,
     1, 2, 3
@@ -104,7 +117,6 @@ class App {
     Shader shaderProgram;
 
     float mix;
-    glm::mat4x4 model;
     glm::mat4x4 view;
     glm::mat4x4 projection;
 
@@ -131,23 +143,23 @@ class App {
         double time = glfwGetTime();
         double offset = std::sin(time) * 0.5;
 
-        model = glm::mat4x4(1.0f);
-        model = glm::rotate(model, (float)time * glm::radians(50.0f),
-            glm::vec3(0.5f, 1.0f, 0.0f));
-
-        shaderProgram.use();
-        shaderProgram.setFloat("horizOffset", offset);
-        shaderProgram.setFloat("mixAmount", mix);
-        shaderProgram.setMat4x4("model", model);
-        shaderProgram.setMat4x4("view", view);
-        shaderProgram.setMat4x4("projection", projection);
-        shaderProgram.setFloat("time", time);
-        for (int i = 0; i < 2; i++) {
-            glActiveTexture(GL_TEXTURE0 + i);
-            glBindTexture(GL_TEXTURE_2D, textures[i]);
-        }
         glBindVertexArray(vao);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+
+        for (int m = 0; m < 10; m++) {
+            glm::mat4x4 model(1.0f);
+            model = glm::translate(model, cubePositions[m]);
+            model = glm::rotate(model, (float)time * glm::radians(20.0f * m),
+                glm::vec3(0.5f, 1.0f, 0.0f));
+
+            shaderProgram.use();
+            shaderProgram.setFloat("horizOffset", offset);
+            shaderProgram.setMat4x4("model", model);
+            shaderProgram.setMat4x4("view", view);
+            shaderProgram.setMat4x4("projection", projection);
+            shaderProgram.setFloat("time", time);
+            glBindTexture(GL_TEXTURE_2D, textures[m % 2]);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
 
         glfwSwapBuffers(window);
     }
@@ -209,7 +221,7 @@ class App {
 public:
     App(Args args) :
         args(args), window(nullptr), windowWidth(WINDOW_WIDTH), windowHeight(WINDOW_HEIGHT),
-        bg_colour(21, 0, 54), shaderProgram(), mix(0.3), model(1.0), view(1.0), projection(1.0)
+        bg_colour(21, 0, 54), shaderProgram(), mix(0.3), view(1.0), projection(1.0)
     {
         init_window();
         shaderProgram = Shader(MODEL_VERT, MODEL_FRAG);
@@ -249,7 +261,7 @@ public:
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
@@ -265,7 +277,7 @@ public:
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
@@ -276,7 +288,6 @@ public:
         shaderProgram.setInt("texture1", 0);
         shaderProgram.setInt("texture2", 1);
 
-        model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
         // note that we’re translating the scene in the reverse direction
         view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
         projection = glm::perspective(
