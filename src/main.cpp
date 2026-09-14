@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <stb_image.h>
 
+#include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "shader.h"
 #include "util.h"
@@ -21,17 +22,43 @@
 #define WINDOW_HEIGHT 600
 #define FPS_SAMPLES 10
 
-struct vertex {
-    float pos[3];
-    float col[3];
-    float tex_coord[2];
-};
-
-vertex vertices[] = {
-    {.pos = {0.5f, 0.5f, 0.0f}, .col = {1.0f, 0.0f, 0.0f}, .tex_coord = {2.0f, 2.0f}}, // top right
-    {.pos = {0.5f, -0.5f, 0.0f}, .col = {0.0f, 1.0f, 0.0f}, .tex_coord = {2.0f, 0.0f}}, // bottom right
-    {.pos = {-0.5f, -0.5f, 0.0f}, .col = {0.0f, 0.0f, 1.0f}, .tex_coord = {0.0f, 0.0f}}, // bottom left
-    {.pos = {-0.5f, 0.5f, 0.0f}, .col = {1.0f, 1.0f, 0.0f}, .tex_coord = {0.0f, 2.0f}} // top left
+float vertices[] = {
+    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+    0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
+    0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+    0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+    -0.5f, 0.5f, -0.5f, 0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+    -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+    0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
+    0.5f, 0.5f, 0.5f, 1.0f, 1.0f,
+    0.5f, 0.5f, 0.5f, 1.0f, 1.0f,
+    -0.5f, 0.5f, 0.5f, 0.0f, 1.0f,
+    -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+    -0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+    -0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+    -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+    -0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+    0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+    0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+    0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+    0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+    0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+    0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+    0.5f, -0.5f, -0.5f, 1.0f, 1.0f,
+    0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
+    0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
+    -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+    -0.5f, 0.5f, -0.5f, 0.0f, 1.0f,
+    0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+    0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+    0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+    -0.5f, 0.5f, 0.5f, 0.0f, 0.0f,
+    -0.5f, 0.5f, -0.5f, 0.0f, 1.0f
 };
 
 const unsigned int indices[] = {
@@ -63,6 +90,8 @@ struct Args {
 
 class App {
     GLFWwindow *window;
+    float windowWidth;
+    float windowHeight;
     colour bg_colour;
     Args args;
 
@@ -75,7 +104,9 @@ class App {
     Shader shaderProgram;
 
     float mix;
-    glm::mat4x4 trans;
+    glm::mat4x4 model;
+    glm::mat4x4 view;
+    glm::mat4x4 projection;
 
     std::deque<double> frame_samples;
 
@@ -96,24 +127,27 @@ class App {
 
     void render() {
         set_clear_colour(bg_colour);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         double time = glfwGetTime();
         double offset = std::sin(time) * 0.5;
 
-        trans = glm::mat4x4(1.0);
-        trans = glm::translate(trans, glm::vec3(0.7, 0.2, 0.0));
-        trans = glm::rotate(trans, (float)time, glm::vec3(0, 0, 1));
+        model = glm::mat4x4(1.0f);
+        model = glm::rotate(model, (float)time * glm::radians(50.0f),
+            glm::vec3(0.5f, 1.0f, 0.0f));
 
         shaderProgram.use();
         shaderProgram.setFloat("horizOffset", offset);
         shaderProgram.setFloat("mixAmount", mix);
-        shaderProgram.setMat4x4("trans", trans);
+        shaderProgram.setMat4x4("model", model);
+        shaderProgram.setMat4x4("view", view);
+        shaderProgram.setMat4x4("projection", projection);
+        shaderProgram.setFloat("time", time);
         for (int i = 0; i < 2; i++) {
             glActiveTexture(GL_TEXTURE0 + i);
             glBindTexture(GL_TEXTURE_2D, textures[i]);
         }
         glBindVertexArray(vao);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
 
         glfwSwapBuffers(window);
     }
@@ -124,9 +158,9 @@ class App {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        glfwWindowHint(GLFW_SAMPLES, 8);
+        //glfwWindowHint(GLFW_SAMPLES, 8);
 
-        window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Hello OpenGL",
+        window = glfwCreateWindow(windowWidth, windowHeight, "Hello OpenGL",
             nullptr, nullptr);
 
         if (window == nullptr) {
@@ -147,22 +181,38 @@ class App {
             throw std::runtime_error("Couldn't initialise GLAD");
         }
 
+        // Set the window user pointer to this so we can access the god struct from glfw callbacks
+        glfwSetWindowUserPointer(window, (void *)this);
+
         // Set the size of the viewport and set it to resize automatically
-        glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+        glViewport(0, 0, windowWidth, windowHeight);
         glfwSetFramebufferSizeCallback(window, [](GLFWwindow *window, int width, int height) {
-            glViewport(0, 0, width, height);
+            App *app = static_cast<App *>(glfwGetWindowUserPointer(window));
+            app->resize(width, height);
         });
 
-        glEnable(GL_MULTISAMPLE);
+        //glEnable(GL_MULTISAMPLE);
+        glEnable(GL_DEPTH_TEST);
+    }
+
+    void resize(int width, int height) {
+        windowWidth = width;
+        windowHeight = height;
+        //projection = glm::perspective(
+        //    glm::radians(45.0f), // fov
+        //    (float)windowWidth / (float)windowHeight, // aspect ratio
+        //    0.1f, // near
+        //    100.0f // far
+        //);
     }
 
 public:
     App(Args args) :
-        args(args), window(nullptr), bg_colour(21, 0, 54),
-        shaderProgram(), mix(0.3), trans(1.0)
+        args(args), window(nullptr), windowWidth(WINDOW_WIDTH), windowHeight(WINDOW_HEIGHT),
+        bg_colour(21, 0, 54), shaderProgram(), mix(0.3), model(1.0), view(1.0), projection(1.0)
     {
         init_window();
-        shaderProgram = Shader(TEXTURE_VERT, TEXTURE_FRAG);
+        shaderProgram = Shader(MODEL_VERT, MODEL_FRAG);
 
         // Initialise vbo and vao for the triangle
         glGenVertexArrays(1, &vao);
@@ -177,14 +227,11 @@ public:
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*) 0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float)*5, (void*) 0);
         glEnableVertexAttribArray(0);
 
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*) sizeof(float[3]));
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(float)*5, (void*) sizeof(float[3]));
         glEnableVertexAttribArray(1);
-
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*) sizeof(float[6]));
-        glEnableVertexAttribArray(2);
 
         // Load textures, first one is a jpg with no transparency, second is a png with transparency
         glGenTextures(2, textures);
@@ -202,8 +249,8 @@ public:
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
         stbi_image_free(data);
@@ -218,8 +265,8 @@ public:
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
         stbi_image_free(data);
@@ -229,8 +276,15 @@ public:
         shaderProgram.setInt("texture1", 0);
         shaderProgram.setInt("texture2", 1);
 
-        trans = glm::scale(trans, glm::vec3(1.5));
-        trans = glm::rotate(trans, glm::radians(45.0f), glm::vec3(0, 0, 1));
+        model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        // note that we’re translating the scene in the reverse direction
+        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+        projection = glm::perspective(
+            glm::radians(45.0f), // fov
+            (float)windowWidth / (float)windowHeight, // aspect ratio
+            0.1f, // near
+            100.0f // far
+        );
     }
 
     ~App() {
