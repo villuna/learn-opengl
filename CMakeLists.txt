@@ -29,6 +29,7 @@ target_sources(logl
     src/util.cpp
     src/shader.cpp
     src/shaders/shaders.h
+    src/texture.cpp
     dependencies/glad/src/gl.c
     dependencies/stb-image/stb_image.cpp
 )

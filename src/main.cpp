@@ -1,7 +1,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <unistd.h>
@@ -15,6 +14,7 @@
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "shader.h"
+#include "texture.h"
 #include "util.h"
 #include "shaders/shaders.h"
 
@@ -80,19 +80,22 @@ const unsigned int indices[] = {
 };
 
 struct Args {
-    bool show_fps, vsync_off;
+    bool show_fps, vsync_off, multisample;
 
     Args() : show_fps(false) {}
     Args(int argc, char **argv) : Args() {
         char opt;
 
-        while ((opt = getopt(argc, argv, "vf")) != -1) {
+        while ((opt = getopt(argc, argv, "vfm")) != -1) {
             switch (opt) {
             case 'v':
                 vsync_off = true;
                 break;
             case 'f':
                 show_fps = true;
+                break;
+            case 'm':
+                multisample = true;
                 break;
             default:
                 throw std::runtime_error("couldn't parse command line args");
@@ -113,10 +116,9 @@ class App {
     // Vertex array object - stores data telling the gpu how to interpret the vertex buffer
     GLuint vao;
     GLuint ebo;
-    GLuint textures[2];
     Shader shaderProgram;
+    std::array<Texture, 2> textures;
 
-    float mix;
     glm::mat4x4 view;
     glm::mat4x4 projection;
 
@@ -126,15 +128,6 @@ class App {
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
             glfwSetWindowShouldClose(window, true);
         }
-
-        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
-            mix += 0.5 * dt;
-        }
-        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
-            mix -= 0.5 * dt;
-        }
-
-        mix = std::clamp(mix, 0.0f, 1.0f);
     }
 
     void render() {
@@ -157,7 +150,8 @@ class App {
             shaderProgram.setMat4x4("view", view);
             shaderProgram.setMat4x4("projection", projection);
             shaderProgram.setFloat("time", time);
-            glBindTexture(GL_TEXTURE_2D, textures[m % 2]);
+            textures[m % 2].use();
+
             glDrawArrays(GL_TRIANGLES, 0, 36);
         }
 
@@ -170,7 +164,9 @@ class App {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        //glfwWindowHint(GLFW_SAMPLES, 8);
+        if (args.multisample) {
+            glfwWindowHint(GLFW_SAMPLES, 8);
+        }
 
         window = glfwCreateWindow(windowWidth, windowHeight, "Hello OpenGL",
             nullptr, nullptr);
@@ -203,25 +199,28 @@ class App {
             app->resize(width, height);
         });
 
-        //glEnable(GL_MULTISAMPLE);
+        if (args.multisample) {
+            glEnable(GL_MULTISAMPLE);
+        }
         glEnable(GL_DEPTH_TEST);
     }
 
     void resize(int width, int height) {
         windowWidth = width;
         windowHeight = height;
-        //projection = glm::perspective(
-        //    glm::radians(45.0f), // fov
-        //    (float)windowWidth / (float)windowHeight, // aspect ratio
-        //    0.1f, // near
-        //    100.0f // far
-        //);
+        glViewport(0, 0, windowWidth, windowHeight);
+        projection = glm::perspective(
+            glm::radians(45.0f), // fov
+            (float)windowWidth / (float)windowHeight, // aspect ratio
+            0.1f, // near
+            100.0f // far
+        );
     }
 
 public:
     App(Args args) :
         args(args), window(nullptr), windowWidth(WINDOW_WIDTH), windowHeight(WINDOW_HEIGHT),
-        bg_colour(21, 0, 54), shaderProgram(), mix(0.3), view(1.0), projection(1.0)
+        bg_colour(21, 0, 54), shaderProgram(), view(1.0), projection(1.0)
     {
         init_window();
         shaderProgram = Shader(MODEL_VERT, MODEL_FRAG);
@@ -245,48 +244,8 @@ public:
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(float)*5, (void*) sizeof(float[3]));
         glEnableVertexAttribArray(1);
 
-        // Load textures, first one is a jpg with no transparency, second is a png with transparency
-        glGenTextures(2, textures);
-
-        int width, height, channels;
-        // Need to flip the textures to align with the opengl rendering axes
-        stbi_set_flip_vertically_on_load(true);
-        unsigned char *data = stbi_load("assets/house md.jpg", &width, &height, &channels, 0);
-
-        if (!data) {
-            throw std::runtime_error("Couldn't load jpg");
-        }
-
-        glBindTexture(GL_TEXTURE_2D, textures[0]);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-        stbi_image_free(data);
-
-        data = stbi_load("assets/don chan.png", &width, &height, &channels, 0);
-
-        if (!data) {
-            throw std::runtime_error("Couldn't load jpg");
-        }
-
-        glBindTexture(GL_TEXTURE_2D, textures[1]);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-        stbi_image_free(data);
-
-        // Tell the gpu which texture corresponds to which varname in the shader
-        shaderProgram.use();
-        shaderProgram.setInt("texture1", 0);
-        shaderProgram.setInt("texture2", 1);
+        textures[0] = Texture("assets/house md.jpg", GL_RGB);
+        textures[1] = Texture("assets/don chan.png", GL_RGBA);
 
         // note that we’re translating the scene in the reverse direction
         view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
