@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <stb_image.h>
 
+#include "camera.h"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "shader.h"
@@ -82,7 +83,7 @@ const unsigned int indices[] = {
 struct Args {
     bool show_fps, vsync_off, multisample;
 
-    Args() : show_fps(false) {}
+    Args() : show_fps(false), vsync_off(false), multisample(false) {}
     Args(int argc, char **argv) : Args() {
         char opt;
 
@@ -119,14 +120,38 @@ class App {
     Shader shaderProgram;
     std::array<Texture, 2> textures;
 
-    glm::mat4x4 view;
+    Camera camera;
     glm::mat4x4 projection;
 
     std::deque<double> frame_samples;
 
     void process_input(float dt) {
+        float moveSpeed = 2 * dt;
+
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
             glfwSetWindowShouldClose(window, true);
+        }
+
+        glm::vec3 cameraPos = camera.getPosition();
+        glm::vec3 cameraTarget = camera.getTarget();
+        glm::vec3 cameraUp = camera.getUp();
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+            camera.setPosition(cameraPos + cameraTarget * moveSpeed);
+        }
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+            camera.setPosition(cameraPos - cameraTarget * moveSpeed);
+        }
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+            camera.setPosition(cameraPos - glm::normalize(glm::cross(cameraTarget, cameraUp)) * moveSpeed);
+        }
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+            camera.setPosition(cameraPos + glm::normalize(glm::cross(cameraTarget, cameraUp)) * moveSpeed);
+        }
+        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+            camera.setPosition(cameraPos + cameraUp * moveSpeed);
+        }
+        if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+            camera.setPosition(cameraPos - cameraUp * moveSpeed);
         }
     }
 
@@ -147,7 +172,7 @@ class App {
             shaderProgram.use();
             shaderProgram.setFloat("horizOffset", offset);
             shaderProgram.setMat4x4("model", model);
-            shaderProgram.setMat4x4("view", view);
+            shaderProgram.setMat4x4("view", camera.getViewMatrix());
             shaderProgram.setMat4x4("projection", projection);
             shaderProgram.setFloat("time", time);
             textures[m % 2].use();
@@ -220,7 +245,7 @@ class App {
 public:
     App(Args args) :
         args(args), window(nullptr), windowWidth(WINDOW_WIDTH), windowHeight(WINDOW_HEIGHT),
-        bg_colour(21, 0, 54), shaderProgram(), view(1.0), projection(1.0)
+        bg_colour(21, 0, 54), shaderProgram(), projection(1.0)
     {
         init_window();
         shaderProgram = Shader(MODEL_VERT, MODEL_FRAG);
@@ -248,7 +273,6 @@ public:
         textures[1] = Texture("assets/don chan.png", GL_RGBA);
 
         // note that we’re translating the scene in the reverse direction
-        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
         projection = glm::perspective(
             glm::radians(45.0f), // fov
             (float)windowWidth / (float)windowHeight, // aspect ratio
