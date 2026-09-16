@@ -10,6 +10,9 @@
 #include <deque>
 #include <stdexcept>
 #include <stb_image.h>
+#include <imgui.h>
+#include <imgui_impl_opengl3.h>
+#include <imgui_impl_glfw.h>
 
 #include "camera.h"
 #include "glm/ext/matrix_clip_space.hpp"
@@ -180,6 +183,10 @@ class App {
             glDrawArrays(GL_TRIANGLES, 0, 36);
         }
 
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
         glfwSwapBuffers(window);
     }
 
@@ -228,6 +235,14 @@ class App {
             glEnable(GL_MULTISAMPLE);
         }
         glEnable(GL_DEPTH_TEST);
+
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGui_ImplGlfw_InitForOpenGL(window, true);
+        ImGui_ImplOpenGL3_Init();
+
+        ImGui::GetIO().Fonts->AddFontDefaultVector();
+        ImGui::GetStyle().FontSizeBase = 16;
     }
 
     void resize(int width, int height) {
@@ -282,6 +297,9 @@ public:
     }
 
     ~App() {
+        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
         glfwTerminate();
     }
 
@@ -316,11 +334,15 @@ public:
 
         // Render loop
         while (!glfwWindowShouldClose(window)) {
+            glfwPollEvents();
             process_input(dt);
 
-            render();
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+            ImGui::ShowDemoWindow();
 
-            glfwPollEvents();
+            render();
 
             double newTime = glfwGetTime();
             dt = newTime - time;
