@@ -15,7 +15,6 @@
 #include <imgui_impl_glfw.h>
 
 #include "camera.h"
-#include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "shader.h"
 #include "texture.h"
@@ -115,6 +114,9 @@ class App {
     colour bg_colour;
     Args args;
 
+    bool cameraEnabled;
+    float mouseX, mouseY;
+
     // Vertex buffer object - handle to the vertex buffer on the gpu
     GLuint vbo;
     // Vertex array object - stores data telling the gpu how to interpret the vertex buffer
@@ -132,29 +134,17 @@ class App {
         float moveSpeed = 2 * dt;
 
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-            glfwSetWindowShouldClose(window, true);
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            cameraEnabled = false;
+            ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
+        } else if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            cameraEnabled = true;
+            ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
         }
 
-        glm::vec3 cameraPos = camera.getPosition();
-        glm::vec3 cameraTarget = camera.getTarget();
-        glm::vec3 cameraUp = camera.getUp();
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-            camera.setPosition(cameraPos + cameraTarget * moveSpeed);
-        }
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-            camera.setPosition(cameraPos - cameraTarget * moveSpeed);
-        }
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-            camera.setPosition(cameraPos - glm::normalize(glm::cross(cameraTarget, cameraUp)) * moveSpeed);
-        }
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-            camera.setPosition(cameraPos + glm::normalize(glm::cross(cameraTarget, cameraUp)) * moveSpeed);
-        }
-        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-            camera.setPosition(cameraPos + cameraUp * moveSpeed);
-        }
-        if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-            camera.setPosition(cameraPos - cameraUp * moveSpeed);
+        if (cameraEnabled) {
+            camera.update(window, moveSpeed);
         }
     }
 
@@ -175,14 +165,13 @@ class App {
             shaderProgram.use();
             shaderProgram.setFloat("horizOffset", offset);
             shaderProgram.setMat4x4("model", model);
-            shaderProgram.setMat4x4("view", camera.getViewMatrix());
+            shaderProgram.setMat4x4("view", camera.getMatrix());
             shaderProgram.setMat4x4("projection", projection);
             shaderProgram.setFloat("time", time);
             textures[m % 2].use();
 
             glDrawArrays(GL_TRIANGLES, 0, 36);
         }
-
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -191,7 +180,7 @@ class App {
     }
 
     // Initialises GLFW and OpenGL and sets up the window ready to be rendered to.
-    void init_window() {
+    void init_window(int width, int height) {
         glfwInit();
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -200,7 +189,7 @@ class App {
             glfwWindowHint(GLFW_SAMPLES, 8);
         }
 
-        window = glfwCreateWindow(windowWidth, windowHeight, "Hello OpenGL",
+        window = glfwCreateWindow(width, height, "Hello OpenGL",
             nullptr, nullptr);
 
         if (window == nullptr) {
@@ -225,10 +214,16 @@ class App {
         glfwSetWindowUserPointer(window, (void *)this);
 
         // Set the size of the viewport and set it to resize automatically
-        glViewport(0, 0, windowWidth, windowHeight);
+        resize(width, height);
+
         glfwSetFramebufferSizeCallback(window, [](GLFWwindow *window, int width, int height) {
-            App *app = static_cast<App *>(glfwGetWindowUserPointer(window));
+            App *app = static_cast<App*>(glfwGetWindowUserPointer(window));
             app->resize(width, height);
+        });
+
+        glfwSetCursorPosCallback(window, [](GLFWwindow *window, double x, double y) {
+            App *app = static_cast<App*>(glfwGetWindowUserPointer(window));
+            app->onMouseMove(x, y);
         });
 
         if (args.multisample) {
@@ -236,12 +231,16 @@ class App {
         }
         glEnable(GL_DEPTH_TEST);
 
+        glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         ImGui_ImplGlfw_InitForOpenGL(window, true);
         ImGui_ImplOpenGL3_Init();
 
-        ImGui::GetIO().Fonts->AddFontDefaultVector();
+        ImGuiIO& io = ImGui::GetIO();
+        io.Fonts->AddFontDefaultVector();
+        io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
         ImGui::GetStyle().FontSizeBase = 16;
     }
 
@@ -249,20 +248,29 @@ class App {
         windowWidth = width;
         windowHeight = height;
         glViewport(0, 0, windowWidth, windowHeight);
-        projection = glm::perspective(
-            glm::radians(45.0f), // fov
-            (float)windowWidth / (float)windowHeight, // aspect ratio
-            0.1f, // near
-            100.0f // far
-        );
+        camera.resize(windowWidth, windowHeight);
+    }
+
+    void onMouseMove(float x, float y) {
+        if (ImGui::GetIO().WantCaptureMouse)
+            return;
+
+        float dx = x - mouseX;
+        float dy = mouseY - y;
+        mouseX = x;
+        mouseY = y;
+
+        if (cameraEnabled) {
+            camera.rotate(dx, dy);
+        }
     }
 
 public:
     App(Args args) :
-        args(args), window(nullptr), windowWidth(WINDOW_WIDTH), windowHeight(WINDOW_HEIGHT),
-        bg_colour(21, 0, 54), shaderProgram(), projection(1.0)
+        args(args), window(nullptr), bg_colour(21, 0, 54), shaderProgram(), projection(1.0),
+        mouseX((float)WINDOW_WIDTH / 2), mouseY((float)WINDOW_HEIGHT / 2), cameraEnabled(false)
     {
-        init_window();
+        init_window(WINDOW_WIDTH, WINDOW_HEIGHT);
         shaderProgram = Shader(MODEL_VERT, MODEL_FRAG);
 
         // Initialise vbo and vao for the triangle
@@ -286,14 +294,6 @@ public:
 
         textures[0] = Texture("assets/house md.jpg", GL_RGB);
         textures[1] = Texture("assets/don chan.png", GL_RGBA);
-
-        // note that we’re translating the scene in the reverse direction
-        projection = glm::perspective(
-            glm::radians(45.0f), // fov
-            (float)windowWidth / (float)windowHeight, // aspect ratio
-            0.1f, // near
-            100.0f // far
-        );
     }
 
     ~App() {
@@ -340,7 +340,20 @@ public:
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
-            ImGui::ShowDemoWindow();
+
+            ImGui::Begin("Hello OpenGL + IMGui");
+
+            if (!cameraEnabled) {
+                ImGui::Text("Press C to enter camera mode");
+            } else {
+                ImGui::Text("Press Esc to exit camera mode");
+            }
+            float fov = glm::degrees(camera.getFov());
+            if (ImGui::SliderFloat("FOV", &fov, 1.0, 90.0)) {
+                camera.setFov(glm::radians(fov));
+            }
+
+            ImGui::End();
 
             render();
 
