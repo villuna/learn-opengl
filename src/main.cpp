@@ -13,6 +13,8 @@
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_impl_glfw.h>
+#include <ft2build.h>
+#include FT_FREETYPE_H
 
 #include "camera.h"
 #include "glm/ext/matrix_transform.hpp"
@@ -271,6 +273,19 @@ public:
         mouseX((float)WINDOW_WIDTH / 2), mouseY((float)WINDOW_HEIGHT / 2), cameraEnabled(false)
     {
         init_window(WINDOW_WIDTH, WINDOW_HEIGHT);
+
+        // Initialise freetype library
+        FT_Library ft;
+        if (FT_Init_FreeType(&ft)) {
+            throw std::runtime_error("Couldn't initialise FreeType");
+        }
+
+        FT_Face font;
+
+        if (FT_New_Face(ft, "assets/FiraSans-Regular.ttf", 0, &font)) {
+            throw std::runtime_error("Couldn't load font");
+        }
+
         shaderProgram = Shader(MODEL_VERT, MODEL_FRAG);
 
         // Initialise vbo and vao for the triangle

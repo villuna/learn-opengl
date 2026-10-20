@@ -18,6 +18,7 @@ add_custom_command(
 
 add_subdirectory(dependencies/glfw)
 add_subdirectory(dependencies/glm)
+add_subdirectory(dependencies/freetype)
 find_package(OpenGL)
 
 target_include_directories(logl PRIVATE dependencies/glad/include)
@@ -51,4 +52,5 @@ target_link_libraries(logl
   PRIVATE
     glfw
     OpenGL::GL
-    glm::glm)
+    glm::glm
+    freetype)
