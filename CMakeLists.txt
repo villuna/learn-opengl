@@ -33,6 +33,7 @@ target_sources(logl
     src/shader.cpp
     src/shaders/shaders.h
     src/texture.cpp
+    src/text.cpp
     src/camera.cpp
 
     dependencies/glad/src/gl.c

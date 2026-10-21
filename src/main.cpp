@@ -1,3 +1,4 @@
+#include "text.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -13,8 +14,6 @@
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_impl_glfw.h>
-#include <ft2build.h>
-#include FT_FREETYPE_H
 
 #include "camera.h"
 #include "glm/ext/matrix_transform.hpp"
@@ -110,6 +109,7 @@ struct Args {
 };
 
 class App {
+    TextRenderer text;
     GLFWwindow *window;
     float windowWidth;
     float windowHeight;
@@ -274,17 +274,7 @@ public:
     {
         init_window(WINDOW_WIDTH, WINDOW_HEIGHT);
 
-        // Initialise freetype library
-        FT_Library ft;
-        if (FT_Init_FreeType(&ft)) {
-            throw std::runtime_error("Couldn't initialise FreeType");
-        }
-
-        FT_Face font;
-
-        if (FT_New_Face(ft, "assets/FiraSans-Regular.ttf", 0, &font)) {
-            throw std::runtime_error("Couldn't load font");
-        }
+        text.load_font("assets/FiraSans-Regular.ttf", 48);
 
         shaderProgram = Shader(MODEL_VERT, MODEL_FRAG);
 
