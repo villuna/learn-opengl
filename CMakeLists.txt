@@ -12,6 +12,8 @@ add_custom_command(
   DEPENDS
     ${SHADERS_DIR}/model.frag
     ${SHADERS_DIR}/model.vert
+    ${SHADERS_DIR}/text.frag
+    ${SHADERS_DIR}/text.vert
   OUTPUT ${SHADERS_DIR}/shaders.h
   COMMAND python embed_shaders.py
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

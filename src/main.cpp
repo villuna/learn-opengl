@@ -110,11 +110,13 @@ struct Args {
 
 class App {
     TextRenderer text;
+    size_t firaSans;
     GLFWwindow *window;
     float windowWidth;
     float windowHeight;
     colour bg_colour;
     Args args;
+    Text hello;
 
     bool cameraEnabled;
     float mouseX, mouseY;
@@ -177,6 +179,9 @@ class App {
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        text.render(hello, glm::vec4(1, 0, 1, 1), glm::vec2(windowWidth, windowHeight));
 
         glfwSwapBuffers(window);
     }
@@ -274,7 +279,10 @@ public:
     {
         init_window(WINDOW_WIDTH, WINDOW_HEIGHT);
 
-        text.load_font("assets/FiraSans-Regular.ttf", 48);
+        text.init();
+        firaSans = text.load_font("assets/FiraSans-Regular.ttf", 48);
+        hello = text.create_text("she needs OPENGL to live", firaSans,
+            glm::vec2(100, 100));
 
         shaderProgram = Shader(MODEL_VERT, MODEL_FRAG);
 
@@ -336,6 +344,7 @@ public:
         double time = glfwGetTime();
         double dt = 0;
         std::deque<double> samples;
+
 
         // Render loop
         while (!glfwWindowShouldClose(window)) {

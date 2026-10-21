@@ -42,3 +42,32 @@ void main() {
     outTexCoord = texCoord;
 }
 )---";
+
+constexpr const char *TEXT_VERT = R"---(#version 330 core
+
+layout (location = 0) in vec2 pos;
+layout (location = 1) in vec2 tex;
+
+uniform mat4x4 projection;
+
+out vec2 outTex;
+
+void main() {
+    gl_Position = projection * vec4(pos, 0, 1);
+    outTex = tex;
+}
+)---";
+
+constexpr const char *TEXT_FRAG = R"---(#version 330 core
+
+in vec2 outTex;
+
+out vec4 colour;
+uniform sampler2D glyphTexture;
+uniform vec4 textColour;
+
+void main() {
+    vec4 glyphColour = vec4(1, 1, 1, texture(glyphTexture, outTex));
+    colour = glyphColour * textColour;
+}
+)---";
