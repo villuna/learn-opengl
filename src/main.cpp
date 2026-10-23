@@ -155,6 +155,7 @@ class App {
     void render() {
         set_clear_colour(bg_colour);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
         double time = glfwGetTime();
         double offset = std::sin(time) * 0.5;
 
@@ -180,6 +181,7 @@ class App {
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glEnable(GL_BLEND);
+        glDisable(GL_DEPTH_TEST);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         text.render(hello, glm::vec4(1, 0, 1, 1), glm::vec2(windowWidth, windowHeight));
 
@@ -350,6 +352,7 @@ public:
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
             process_input(dt);
+            hello.update();
 
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();

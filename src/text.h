@@ -27,9 +27,9 @@ struct Character {
 
 class Text {
     GLuint vbo, vao;
+    std::vector<float> data;
     size_t fontId;
     std::string text;
-
 
 public:
     Text() : vbo(GL_NONE), vao(GL_NONE) {}
@@ -45,6 +45,7 @@ public:
     Text(Text&& other) :
         vao(std::exchange(other.vao, GL_NONE)),
         vbo(std::exchange(other.vbo, GL_NONE)),
+        data(std::move(other.data)),
         fontId(other.fontId),
         text(std::move(other.text))
     {}
@@ -52,10 +53,13 @@ public:
     Text& operator=(Text&& other) {
         vao = std::exchange(other.vao, GL_NONE);
         vbo = std::exchange(other.vbo, GL_NONE);
+        data = std::move(other.data);
         fontId = other.fontId;
         text = std::move(other.text);
         return *this;
     }
+
+    void update();
 
     friend class TextRenderer;
 };

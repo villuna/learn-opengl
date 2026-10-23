@@ -30,8 +30,8 @@ Character::Character(FT_Face font, char c) {
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     size = glm::ivec2(font->glyph->bitmap.width, font->glyph->bitmap.rows);
     bearing = glm::ivec2(font->glyph->bitmap_left, font->glyph->bitmap_top);
@@ -132,11 +132,12 @@ Text TextRenderer::create_text(const std::string& text, size_t fontId, glm::vec2
 
     glBindVertexArray(t.vao);
     glBindBuffer(GL_ARRAY_BUFFER, t.vbo);
-    glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(float), data.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(float), data.data(), GL_DYNAMIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
+    t.data = std::move(data);
 
     return t;
 }
@@ -157,4 +158,46 @@ void TextRenderer::render(const Text& text, glm::vec4 col, glm::vec2 windowSize)
         glBindTexture(GL_TEXTURE_2D, map.at(text.text[i]).texId);
         glDrawArrays(GL_TRIANGLES, i * 6, 6);
     }
+}
+
+void Text::update() {
+    float jitter = 1;
+
+    auto randf = []() {
+        return 2*(float)rand()/(float)RAND_MAX - 1;
+    };
+
+    for (int i = 0; i < data.size() / 24; i++) {
+        // Since we have two vertices that are shared between two triangles we want to keep those
+        // vertices together.
+        // This would have been easier if I had used a vertex and index buffer. Maybe I should do
+        // that. TODO.
+        float randx[4];
+        float randy[4];
+        for (int i = 0; i < 4; i++) {
+            randx[i] = randf() * jitter;
+            randy[i] = randf() * jitter;
+        }
+
+        data[i * 24] += randx[0];
+        data[i * 24 + 1] += randy[0];
+
+        data[i * 24 + 4] += randx[1];
+        data[i * 24 + 5] += randy[1];
+
+        data[i * 24 + 8] += randx[2];
+        data[i * 24 + 9] += randy[2];
+
+        data[i * 24 + 12] += randx[0];
+        data[i * 24 + 13] += randy[0];
+
+        data[i * 24 + 16] += randx[2];
+        data[i * 24 + 17] += randy[2];
+
+        data[i * 24 + 20] += randx[3];
+        data[i * 24 + 21] += randy[3];
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, data.size() * sizeof(float), data.data());
 }
